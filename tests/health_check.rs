@@ -1,6 +1,6 @@
+use sqlx::{Connection, PgConnection, Row};
 use std::net::TcpListener;
-use sqlx::{ PgConnection, Connection, Row };
-use zero2prod::configuration::{ self, get_configuration };
+use zero2prod::configuration::{self, get_configuration};
 
 fn spawn_app() -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
@@ -17,7 +17,8 @@ async fn health_check_works() {
 
     let response = client
         .get(&format!("{}/health_check", &address))
-        .send().await
+        .send()
+        .await
         .expect("Failed to execute request.");
 
     assert!(response.status().is_success());
@@ -30,9 +31,9 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let configuration = get_configuration().expect("Failed to read configuration");
     let connection_string = configuration.database.connection_string();
 
-    let mut connection = PgConnection::connect(&connection_string).await.expect(
-        "Failed to connect to Postgres."
-    );
+    let mut connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
 
     let client = reqwest::Client::new();
 
@@ -41,14 +42,15 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .post(&format!("{}/subscriptions", &app_address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
-        .send().await
+        .send()
+        .await
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
 
-    let saved = sqlx
-        ::query("SELECT email, name FROM subscriptions")
-        .fetch_one(&mut connection).await
+    let saved = sqlx::query("SELECT email, name FROM subscriptions")
+        .fetch_one(&mut connection)
+        .await
         .expect("Failed to fetch saved subscription.");
 
     let email: String = saved.get("email");
@@ -64,7 +66,7 @@ async fn subscribe_returns_a_400_when_data_is_mising() {
     let test_case = vec![
         ("name=le%20guin", "missing the email"),
         ("email=ursila_le_guin%40toto.fr", "mising the name"),
-        ("", "missing both name and email")
+        ("", "missing both name and email"),
     ];
 
     for (invalid_body, error_message) in test_case {
@@ -72,7 +74,8 @@ async fn subscribe_returns_a_400_when_data_is_mising() {
             .post(&format!("{}/subscriptions", &app_address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(invalid_body)
-            .send().await
+            .send()
+            .await
             .expect("Failed to execute request");
         assert_eq!(
             400,
