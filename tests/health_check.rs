@@ -1,7 +1,7 @@
-use sqlx::{ Connection, Executor, PgConnection, PgPool };
-use uuid::Uuid;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
-use zero2prod::configuration::{ DatabaseSettings, get_configuration };
+use uuid::Uuid;
+use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::run;
 
 pub struct TestApp {
@@ -20,22 +20,27 @@ async fn spawn_app() -> TestApp {
 
     let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
-    TestApp { address, db_pool: connection_pool }
+    TestApp {
+        address,
+        db_pool: connection_pool,
+    }
 }
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.connection_string_without_db()).await.expect(
-        "Failed to connct to Postgres."
-    );
+    let mut connection = PgConnection::connect(&config.connection_string_without_db())
+        .await
+        .expect("Failed to connct to Postgres.");
     connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str()).await
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .await
         .expect("Failed to create database.");
 
-    let connection_pool = PgPool::connect(&config.connection_string()).await.expect(
-        "Failed to connect to Postgres."
-    );
+    let connection_pool = PgPool::connect(&config.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
     sqlx::migrate!("./migrations")
-        .run(&connection_pool).await
+        .run(&connection_pool)
+        .await
         .expect("Failed to migrate the database.");
     connection_pool
 }
@@ -47,7 +52,8 @@ async fn health_check_works() {
 
     let response = client
         .get(&format!("{}/health_check", &app.address))
-        .send().await
+        .send()
+        .await
         .expect("Failed to execute request.");
 
     assert!(response.status().is_success());
@@ -65,14 +71,15 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .post(&format!("{}/subscriptions", &app.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
-        .send().await
+        .send()
+        .await
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
 
-    let saved = sqlx
-        ::query!("SELECT email, name FROM subscriptions")
-        .fetch_one(&app.db_pool).await
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+        .fetch_one(&app.db_pool)
+        .await
         .expect("Failed to fetch saved subscription.");
 
     assert_eq!(saved.email, "ursula_le_guin@toto.fr");
@@ -86,7 +93,7 @@ async fn subscribe_returns_a_400_when_data_is_mising() {
     let test_case = vec![
         ("name=le%20guin", "missing the email"),
         ("email=ursila_le_guin%40toto.fr", "mising the name"),
-        ("", "missing both name and email")
+        ("", "missing both name and email"),
     ];
 
     for (invalid_body, error_message) in test_case {
@@ -94,7 +101,8 @@ async fn subscribe_returns_a_400_when_data_is_mising() {
             .post(&format!("{}/subscriptions", &app.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(invalid_body)
-            .send().await
+            .send()
+            .await
             .expect("Failed to execute request");
         assert_eq!(
             400,
